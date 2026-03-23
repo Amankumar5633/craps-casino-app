@@ -3,48 +3,90 @@ import random
 import time
 import matplotlib.pyplot as plt
 
-# -------- PAGE CONFIG --------
-st.set_page_config(page_title="🎲 Craps Casino", layout="centered")
+st.set_page_config(page_title="🎰 Vegas Craps", layout="wide")
 
-# -------- CUSTOM UI (CASINO STYLE) --------
+# ---------- NEON CASINO UI ----------
 st.markdown("""
 <style>
 body {
-    background-color: #0e1117;
+    background: radial-gradient(circle, #0b0f1a, #000000);
     color: white;
 }
 h1 {
     text-align: center;
     color: #00ffcc;
+    text-shadow: 0 0 20px #00ffcc;
 }
-.stButton>button {
-    border-radius: 10px;
-    background: linear-gradient(90deg, #00ffcc, #00ccff);
+.chip {
+    font-size: 22px;
+    padding: 8px;
+    border-radius: 50%;
+    background: gold;
     color: black;
-    font-weight: bold;
-    height: 3em;
-    width: 100%;
+    text-align: center;
+}
+.result {
+    text-align: center;
+    font-size: 32px;
+    margin-top: 10px;
 }
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1>🎲 Craps Casino</h1>", unsafe_allow_html=True)
+st.markdown("<h1>🎰 VEGAS CRAPS TABLE</h1>", unsafe_allow_html=True)
 
-# -------- SESSION STATE --------
+# ---------- STATE ----------
 if "balance" not in st.session_state:
-    st.session_state.balance = 100
-    st.session_state.bet = 10
+    st.session_state.balance = 1000
+    st.session_state.bet = 100
     st.session_state.point = None
     st.session_state.phase = "comeout"
     st.session_state.history = []
+    st.session_state.result = ""
+    st.session_state.bet_type = "Pass Line"
 
-# -------- FUNCTIONS --------
-def roll_dice_animation():
-    placeholder = st.empty()
+# ---------- SIDEBAR ----------
+st.sidebar.title("🎲 Casino Controls")
+
+st.session_state.bet = st.sidebar.slider("🪙 Chips", 50, 500, st.session_state.bet, step=50)
+
+st.session_state.bet_type = st.sidebar.radio(
+    "🎯 Bet Type",
+    ["Pass Line", "Don't Pass"]
+)
+
+# ---------- TOP DASHBOARD ----------
+c1, c2, c3, c4 = st.columns(4)
+
+c1.metric("💰 Balance", f"₹{st.session_state.balance}")
+c2.metric("🪙 Bet", f"₹{st.session_state.bet}")
+c3.metric("🎯 Point", st.session_state.point if st.session_state.point else "-")
+c4.metric("🎲 Phase", st.session_state.phase.upper())
+
+st.markdown("---")
+
+# ---------- SOUND ----------
+def play_sound():
+    st.audio("https://www.soundjay.com/misc/sounds/dice-roll-1.mp3")
+
+# ---------- DICE ----------
+dice_images = {
+    1: "https://upload.wikimedia.org/wikipedia/commons/1/1b/Dice-1-b.svg",
+    2: "https://upload.wikimedia.org/wikipedia/commons/5/5f/Dice-2-b.svg",
+    3: "https://upload.wikimedia.org/wikipedia/commons/b/b1/Dice-3-b.svg",
+    4: "https://upload.wikimedia.org/wikipedia/commons/f/fd/Dice-4-b.svg",
+    5: "https://upload.wikimedia.org/wikipedia/commons/0/08/Dice-5-b.svg",
+    6: "https://upload.wikimedia.org/wikipedia/commons/2/26/Dice-6-b.svg"
+}
+
+dice_area = st.empty()
+
+def roll_animation():
+    play_sound()
     for _ in range(10):
         d1 = random.randint(1,6)
         d2 = random.randint(1,6)
-        placeholder.markdown(f"## 🎲 {d1} 🎲 {d2}")
+        dice_area.image([dice_images[d1], dice_images[d2]], width=120)
         time.sleep(0.08)
     return d1, d2
 
@@ -52,84 +94,80 @@ def reset_round():
     st.session_state.point = None
     st.session_state.phase = "comeout"
 
-# -------- UI --------
-col1, col2 = st.columns(2)
-col1.metric("💰 Balance", f"₹{st.session_state.balance}")
-col2.metric("🎯 Bet", f"₹{st.session_state.bet}")
+# ---------- GAME LOGIC ----------
+def play_round(total):
+    bet_type = st.session_state.bet_type
 
-st.markdown("---")
-
-# Bet Controls
-col3, col4 = st.columns(2)
-
-if col3.button("➕ Increase Bet"):
-    st.session_state.bet += 10
-
-if col4.button("➖ Decrease Bet"):
-    st.session_state.bet = max(10, st.session_state.bet - 10)
-
-st.markdown("---")
-
-# Roll Dice
-if st.button("🎲 Roll Dice"):
-    if st.session_state.balance < st.session_state.bet:
-        st.error("❌ Not enough balance!")
-    else:
-        d1, d2 = roll_dice_animation()
-        total = d1 + d2
-
-        st.markdown(f"## Result: 🎲 {d1} + {d2} = {total}")
-
-        # COME OUT PHASE
-        if st.session_state.phase == "comeout":
-            if total in [7, 11]:
-                st.success("🎉 You WIN!")
-                st.session_state.balance += st.session_state.bet
-            elif total in [2, 3, 12]:
-                st.error("💀 You LOSE!")
-                st.session_state.balance -= st.session_state.bet
-            else:
-                st.session_state.point = total
-                st.session_state.phase = "point"
-                st.warning(f"👉 Point set to {total}")
-
-        # POINT PHASE
+    if st.session_state.phase == "comeout":
+        if total in [7,11]:
+            win = (bet_type == "Pass Line")
+        elif total in [2,3,12]:
+            win = (bet_type == "Don't Pass")
         else:
-            if total == st.session_state.point:
-                st.success("🎉 You hit the point → WIN!")
-                st.session_state.balance += st.session_state.bet
-                reset_round()
-            elif total == 7:
-                st.error("💀 Rolled 7 → LOSE!")
-                st.session_state.balance -= st.session_state.bet
-                reset_round()
-            else:
-                st.info("➡️ Keep rolling...")
+            st.session_state.point = total
+            st.session_state.phase = "point"
+            st.session_state.result = f"🎯 Point is {total}"
+            return
+    else:
+        if total == st.session_state.point:
+            win = (bet_type == "Pass Line")
+            reset_round()
+        elif total == 7:
+            win = (bet_type == "Don't Pass")
+            reset_round()
+        else:
+            st.session_state.result = f"➡️ Rolling... ({total})"
+            return
 
-        st.session_state.history.append(st.session_state.balance)
+    if win:
+        st.session_state.balance += st.session_state.bet
+        st.session_state.result = f"🎉 WIN ({bet_type})"
+    else:
+        st.session_state.balance -= st.session_state.bet
+        st.session_state.result = f"💀 LOSE ({bet_type})"
 
-# -------- POINT DISPLAY --------
-if st.session_state.point:
-    st.markdown(f"### 🎯 Current Point: {st.session_state.point}")
+    st.session_state.history.append(st.session_state.balance)
 
-# -------- GRAPH --------
+# ---------- CENTER TABLE ----------
+st.markdown("## 🎲 Roll Area")
+
+if st.button("🎲 ROLL DICE", use_container_width=True):
+    if st.session_state.balance < st.session_state.bet:
+        st.error("❌ Not enough chips!")
+    else:
+        d1, d2 = roll_animation()
+        total = d1 + d2
+        play_round(total)
+
+# ---------- RESULT ----------
+st.markdown(f"<div class='result'>{st.session_state.result}</div>", unsafe_allow_html=True)
+
+# ---------- STATS ----------
 st.markdown("---")
-st.subheader("📊 Balance Over Time")
+colA, colB = st.columns(2)
 
-if len(st.session_state.history) > 1:
-    fig, ax = plt.subplots()
-    ax.plot(st.session_state.history)
-    ax.set_xlabel("Rounds")
-    ax.set_ylabel("Balance")
-    ax.set_title("Performance")
-    st.pyplot(fig)
-else:
-    st.info("Play more rounds to see graph!")
+with colA:
+    st.subheader("📊 Balance Trend")
+    if len(st.session_state.history) > 1:
+        fig, ax = plt.subplots()
+        ax.plot(st.session_state.history)
+        ax.set_xlabel("Rounds")
+        ax.set_ylabel("Balance")
+        st.pyplot(fig)
 
-# -------- RESET --------
-if st.button("🔄 Reset Game"):
-    st.session_state.balance = 100
-    st.session_state.bet = 10
+with colB:
+    st.subheader("📈 Game Stats")
+    st.write(f"Total Rounds: {len(st.session_state.history)}")
+    if st.session_state.history:
+        st.write(f"Max Balance: ₹{max(st.session_state.history)}")
+        st.write(f"Min Balance: ₹{min(st.session_state.history)}")
+
+# ---------- RESET ----------
+st.markdown("---")
+if st.button("🔄 RESET TABLE", use_container_width=True):
+    st.session_state.balance = 1000
+    st.session_state.bet = 100
     st.session_state.point = None
     st.session_state.phase = "comeout"
     st.session_state.history = []
+    st.session_state.result = ""
