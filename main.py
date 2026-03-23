@@ -61,3 +61,10 @@ def roll(username: str):
         "result": result,
         "balance": users[username]["balance"]
     }
+@app.get("/leaderboard")
+def leaderboard():
+    return sorted(
+        [{"user": u, "balance": users[u]["balance"]} for u in users],
+        key=lambda x: x["balance"],
+        reverse=True
+    )
