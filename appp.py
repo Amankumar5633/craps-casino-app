@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-API = "http://127.0.0.1:8000"
+API = "https://your-codespace-url-8000.app.github.dev"
 
 st.title("🎰 Craps SaaS Casino")
 
